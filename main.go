@@ -2,10 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"log"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"log"
 )
 
 var db *sql.DB
@@ -15,7 +14,14 @@ type registerUser struct {
 	Nama string
 }
 
+type loginUser struct {
+	Id int
+	IdRegister int
+	Nama string
+}
+
 var regis []registerUser
+var login []loginUser
 
 func main() {
 	var err error
@@ -28,6 +34,8 @@ func main() {
 	r := gin.Default()
 	r.GET("/regis", RegisterUser)
 	r.GET("/regis/:nama", RegisterUserPilihan)
+	//r.GET("/login", LoginUser)
+	r.GET("/login", LoginUserPilihan)
 	r.Run()
 }
 
@@ -47,7 +55,6 @@ func RegisterUser(c *gin.Context) {
 			err = rows.Scan(&id, &nama)
 			listUser = append(listUser, registerUser{
 				ID:id, Nama:nama })
-			fmt.Print(id, nama)
 		}
 
 		c.JSON(200, gin.H{
@@ -94,4 +101,72 @@ func RegisterUserPilihan(c *gin.Context) {
 			"registerUser": listUser,
 		})
 	}
+}
+
+func LoginUser(c *gin.Context) {
+	rows, err := db.Query("SELECT id, idRegister, nama FROM loginUser")
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{
+			"code": 500,
+			"message": "Internal server error",
+		})
+	}
+	var listUser []loginUser
+	for rows.Next(){
+		var id int
+		var idregis int
+		var nama string
+		err = rows.Scan(&id, &idregis, &nama)
+		listUser = append(listUser, loginUser{
+			Id:id, IdRegister:idregis, Nama:nama })
+	}
+
+	c.JSON(200, gin.H{
+		"code": 200,
+		"success" :true,
+		"status": "Success",
+		"loginUser": listUser,
+	})
+}
+
+func LoginUserPilihan(c *gin.Context) {
+	name := c.Query("nama")
+	idRegis := c.Query("idregis")
+	rows, err := db.Query("SELECT id, idRegister, nama FROM loginUser where nama = ? and idRegister = ?", name, idRegis)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, gin.H{
+			"code": 500,
+			"message": "Internal Service Error",
+		})
+	}
+
+	var listUser []loginUser
+	for rows.Next(){
+		var id int
+		var idregis int
+		var nama string
+		err = rows.Scan(&id, &idregis, &nama)
+		log.Println(err)
+		listUser = append(listUser, loginUser{
+			Id:id, IdRegister:idregis, Nama:nama })
+	}
+
+	if listUser == nil {
+		c.JSON(404, gin.H{
+			"code": 404,
+			"success" :false,
+			"status": "Failed",
+			"message": "data tidak ditemukan",
+		})
+	}else{
+		c.JSON(200, gin.H{
+			"code": 200,
+			"success" :true,
+			"status": "Success",
+			"loginUser": listUser,
+		})
+	}
+
 }
