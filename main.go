@@ -20,8 +20,16 @@ type loginUser struct {
 	Nama string
 }
 
+type orderProduk struct {
+	id int
+	idLogin int
+	nama string
+	harga int
+}
+
 var regis []registerUser
 var login []loginUser
+var order []orderProduk
 
 func main() {
 	var err error
@@ -32,9 +40,9 @@ func main() {
 	defer db.Close()
 
 	r := gin.Default()
-	r.GET("/regis", RegisterUser)
+	r.GET("/regis/", RegisterUser)
 	r.GET("/regis/:nama", RegisterUserPilihan)
-	//r.GET("/login", LoginUser)
+	r.GET("/login/viewall", LoginUser)
 	r.GET("/login", LoginUserPilihan)
 	r.Run()
 }
@@ -168,5 +176,5 @@ func LoginUserPilihan(c *gin.Context) {
 			"loginUser": listUser,
 		})
 	}
-
 }
+
