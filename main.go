@@ -2,12 +2,11 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
-	"net/http"
 )
 
 var db *sql.DB
@@ -25,7 +24,7 @@ type loginUser struct {
 
 type orderProduk struct {
 	Id int
-	IdLogin int
+	IdUsers int
 	Nama string
 	Harga int
 }
@@ -44,27 +43,30 @@ func main() {
 
 	r := gin.Default()
 
-	r.GET("/regis/", RegisterUser)
+	r.GET("/regis", RegisterUser)
 	r.GET("/regis/:nama", RegisterUserPilihan)
-	r.GET("/login/", LoginUser)
+	r.GET("/login", LoginUser)
 	r.GET("/login/:nama", LoginUserPilihan)
-	//r.Use(logger())
-	r.GET("/order/", OrderProduk)
-	r.GET("/order/:nama", OrderProdukPilihan)
-
+	r.GET("/order/:nama", CreateTokenEndpoint)
+	r.Use(logger())
+	r.GET("/order", OrderProduk)
 	r.Run()
 }
+
+/* code dibawah ini merupakan proses pembuatan API yang mengembalikan semua users yang melakukan register.
+	data yang ditampilakan sebatas id user dan nama lengkap dari user tersebut */
 
 func RegisterUser(c *gin.Context) {
 	rows, err := db.Query("SELECT id, fullname FROM users")
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal server error",
 		})
 	}
 	var listUser []registerUser
+	// memasukan data di database kedalam struct yang dibuat
 		for rows.Next(){
 			var id int
 			var nama string
@@ -72,7 +74,7 @@ func RegisterUser(c *gin.Context) {
 			listUser = append(listUser, registerUser{
 				Id:id, FullName:nama })
 		}
-
+	// mengembalikan code 200 apabila data yang dicari ditemukan
 		c.JSON(200, gin.H{
 			"code": 200,
 			"success" :true,
@@ -81,11 +83,14 @@ func RegisterUser(c *gin.Context) {
 		})
 }
 
+/* code dibawah ini merupakan proses pembuatan API yang mengembalikan users yang melakukan register dengan parameter nama.
+	data yang ditampilakan sebatas id user dan nama lengkap dari user tersebut */
+
 func RegisterUserPilihan(c *gin.Context) {
 	name := c.Param("nama")
 	rows, err := db.Query("SELECT id, fullname FROM users where name = ?", name)
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal Service Error",
@@ -93,6 +98,7 @@ func RegisterUserPilihan(c *gin.Context) {
 	}
 
 	var listUser []registerUser
+	// memasukan data di database kedalam struct yang dibuat
 	for rows.Next(){
 		var id int
 		var nama string
@@ -103,6 +109,7 @@ func RegisterUserPilihan(c *gin.Context) {
 	}
 
 	if listUser == nil {
+		// mengembalikan error 404 apabila data yang dicari tidak ditemukan
 		c.JSON(404, gin.H{
 			"code": 404,
 			"success" :false,
@@ -110,6 +117,7 @@ func RegisterUserPilihan(c *gin.Context) {
 			"message": "data tidak ditemukan",
 		})
 	}else{
+		// mengembalikan code 200 apabila data yang dicari ditemukan
 		c.JSON(200, gin.H{
 			"code": 200,
 			"success" :true,
@@ -119,25 +127,28 @@ func RegisterUserPilihan(c *gin.Context) {
 	}
 }
 
+/* code dibawah ini merupakan proses pembuatan API yang mengembalikan semua users yang melakukan login.
+	data yang ditampilakan sebatas id user, nama dari user tersebut */
+
 func LoginUser(c *gin.Context) {
-	rows, err := db.Query("SELECT id, name, password FROM users")
+	rows, err := db.Query("SELECT id, name FROM users")
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal server error",
 		})
 	}
 	var listUser []loginUser
+	// memasukan data di database kedalam struct yang dibuat
 	for rows.Next(){
 		var id int
 		var nama string
-		var password string
-		err = rows.Scan(&id, &nama, &password)
+		err = rows.Scan(&id, &nama)
 		listUser = append(listUser, loginUser{
-			Id:id, Password:password, Nama:nama })
+			Id:id, Nama:nama })
 	}
-
+	// mengembalikan code 200 apabila data yang dicari ditemukan
 	c.JSON(200, gin.H{
 		"code": 200,
 		"success" :true,
@@ -146,11 +157,14 @@ func LoginUser(c *gin.Context) {
 	})
 }
 
+/* code dibawah ini merupakan proses pembuatan API yang mengembalikan users yang melakukan login dengan parameter nama.
+	data yang ditampilakan sebatas id user, nama dari user tersebut */
+
 func LoginUserPilihan(c *gin.Context) {
 	name := c.Param("nama")
-	rows, err := db.Query("SELECT id, name, password FROM users where name = ?", name)
+	rows, err := db.Query("SELECT id, name FROM users where name = ?", name)
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal Service Error",
@@ -158,16 +172,17 @@ func LoginUserPilihan(c *gin.Context) {
 	}
 
 	var listUser []loginUser
+	// memasukan data di database kedalam struct yang dibuat
 	for rows.Next(){
 		var id int
 		var nama string
-		var password string
-		err = rows.Scan(&id, &nama, &password)
+		err = rows.Scan(&id, &nama)
 		listUser = append(listUser, loginUser{
-			Id:id, Password:password, Nama:nama })
+			Id:id, Nama:nama })
 	}
 
 	if listUser == nil {
+		// mengembalikan error 404 apabila data yang dicari tidak ditemukan
 		c.JSON(404, gin.H{
 			"code": 404,
 			"success" :false,
@@ -175,6 +190,7 @@ func LoginUserPilihan(c *gin.Context) {
 			"message": "data tidak ditemukan",
 		})
 	}else{
+		// mengembalikan code 200 apabila data yang dicari ditemukan
 		c.JSON(200, gin.H{
 			"code": 200,
 			"success" :true,
@@ -183,44 +199,68 @@ func LoginUserPilihan(c *gin.Context) {
 		})
 	}
 }
-
+/* code dibawah ini merupakan proses pembuatan Authorization yang token users yang melakukan login dengan parameter nama.
+	pass decode yang yang digunakan adalah secret */
 func logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		aout := c.GetHeader("Authorization")
-		log.Println(aout)
-		if aout != "tamasia" {
-			c.JSON(400, gin.H{
-				"code": 400,
+		if aout == "" {
+			// mengembalikan error 404 apabila data yang dicari tidak ditemukan
+			c.JSON(404, gin.H{
+				"code": 404,
 				"success" :false,
 				"status": "Failed",
 				"message": "tidak ada akses",
 			})
 			c.Abort()
 		}
+		// proses penggunaan token yang telah dibuat di order/:nama
+		token, _ := jwt.Parse(aout, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("There was an error")
+			}
+			return []byte("secret"), nil
+		})
 
+		if _, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+
+		} else {
+			// mengembalikan error 404 apabila data yang dicari tidak ditemukan
+			c.JSON(404, gin.H{
+				"code": 404,
+				"success" :false,
+				"status": "Failed",
+				"message": "tidak ada akses",
+			})
+			c.Abort()
+		}
 	}
 }
 
+/* code dibawah ini merupakan proses pembuatan API yang mengembalikan semua order produk.
+	data yang ditampilakan sebatas id user, nama dari user tersebut */
+
 func OrderProduk(c *gin.Context) {
-	rows, err := db.Query("SELECT id, idLogin, nama, harga FROM orderProduk")
+	rows, err := db.Query("SELECT id, idUsers, nama, harga FROM orderProduk")
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal server error",
 		})
 	}
 	var listOrder []orderProduk
+	// memasukan data di database kedalam struct yang dibuat
 	for rows.Next(){
 		var id int
-		var idlogin int
+		var idusers int
 		var nama string
 		var harga int
-		err = rows.Scan(&id, &idlogin, &nama, &harga)
+		err = rows.Scan(&id, &idusers, &nama, &harga)
 		listOrder = append(listOrder, orderProduk{
-			Id:id, IdLogin:idlogin, Nama:nama, Harga:harga })
+			Id:id, IdUsers:idusers, Nama:nama, Harga:harga })
 	}
-
+	// mengembalikan code 200 apabila data yang dicari ditemukan
 	c.JSON(200, gin.H{
 		"code": 200,
 		"success" :true,
@@ -229,55 +269,40 @@ func OrderProduk(c *gin.Context) {
 	})
 }
 
-func OrderProdukPilihan(c *gin.Context) {
+/* code dibawah ini merupakan proses pembuatan Token yang mengembalikan hasil decode dari user yang login dengan
+	parameter nama.
+	data yang ditampilkan sebatas id user, nama, dan password dari user tersebut */
+
+func CreateTokenEndpoint(c *gin.Context) {
 	name := c.Param("nama")
-	rows, err := db.Query("SELECT id, idLogin, nama, harga FROM orderProduk where nama = ?", name)
+	rows, err := db.Query("SELECT id, name, password FROM users where name = ?", name)
 	if err != nil {
-		log.Println(err)
+		// mengembalikan error 500 apabila tidak tersambung dengan database
 		c.JSON(500, gin.H{
 			"code": 500,
 			"message": "Internal Service Error",
 		})
 	}
 
-	var listOrder []orderProduk
+	var id int
+	var nama string
+	var password string
+	// memasukan data di database kedalam struct yang dibuat
 	for rows.Next(){
-		var id int
-		var idlogin int
-		var nama string
-		var harga int
-		err = rows.Scan(&id, &idlogin, &nama, &harga)
-		listOrder = append(listOrder, orderProduk{
-			Id:id, IdLogin:idlogin, Nama:nama, Harga:harga })
+		err = rows.Scan(&id, &nama, &password)
 	}
 
-	if listOrder == nil {
-		c.JSON(404, gin.H{
-			"code": 404,
-			"success" :false,
-			"status": "Failed",
-			"message": "data tidak ditemukan",
-		})
-	}else{
-		c.JSON(200, gin.H{
-			"Code": 200,
-			"Success" :true,
-			"Status": "Success",
-			"OrderProduk": listOrder,
-		})
+	// pengambilan id, nama, dan password dari db dan dimasukan ke variabel user
+	user := loginUser{Id:id, Nama:nama, Password:password}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": user.Nama,
+		"password": user.Password,
+	})
+	// password decode yang digunakan adalah secret
+	tokenString, error := token.SignedString([]byte("secret"))
+	if error != nil {
+		fmt.Println(error)
 	}
+	// mengembalikan pesan sukses apabila berhasil
+	c.JSON(200, tokenString)
 }
-
-//func CreateTokenEndpoint(w http.ResponseWriter, req *http.Request) {
-//	var user users
-//	_ = json.NewDecoder(req.Body).Decode(&user)
-//	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-//		"username": user.Username,
-//		"password": user.Password,
-//	})
-//	tokenString, error := token.SignedString([]byte("secret"))
-//	if error != nil {
-//		fmt.Println(error)
-//	}
-//	json.NewEncoder(w).Encode(JwtToken{Token: tokenString})
-//}
